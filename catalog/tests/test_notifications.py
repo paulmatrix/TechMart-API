@@ -75,12 +75,11 @@ class NotificationFunctionTestCase(BaseNotificationTestCase):
     def test_initialize_africastalking_success(self, mock_africastalking):
         """Test successful Africa's Talking initialization."""
         mock_sms = MagicMock()
-        mock_africastalking.SMS.return_value = mock_sms
+        mock_africastalking.SMS = mock_sms  # Set SMS as the class, not a factory
         
         result = initialize_africastalking()
         
         mock_africastalking.initialize.assert_called_once()
-        mock_africastalking.SMS.assert_called_once()
         self.assertEqual(result, mock_sms)
     
     @patch('catalog.notifications.africastalking')
@@ -225,10 +224,12 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
         """Test SMS task failure."""
         mock_send_sms.return_value = False
         
-        result = send_order_sms_task('+1234567890', 1)
-        
-        self.assertFalse(result['success'])
-        self.assertIn('error', result)
+        # Mock the retry mechanism to prevent actual retries in tests
+        with patch.object(send_order_sms_task, 'retry') as mock_retry:
+            mock_retry.side_effect = Exception("Task failed")
+            
+            with self.assertRaises(Exception):
+                send_order_sms_task('+1234567890', 1)
     
     @patch('catalog.notifications.send_order_email')
     def test_send_order_email_task_success(self, mock_send_email):
@@ -317,29 +318,27 @@ class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
     @patch('catalog.tasks.process_order_notifications.delay')
     def test_order_creation_triggers_notifications(self, mock_process_notifications):
         """Test that order creation triggers notification tasks."""
-        # Mock OIDC authentication
-        with patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True):
-            # Get JWT token
-            refresh = RefreshToken.for_user(self.user)
-            access_token = str(refresh.access_token)
-            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-            
-            # Create order
-            url = reverse('catalog:order-list')
-            data = {
-                'items': [
-                    {'product': self.iphone.id, 'quantity': 1}
-                ]
-            }
-            
-            response = self.client.post(url, data)
-            
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            
-            # Verify notification task was triggered
-            mock_process_notifications.assert_called_once()
-            order_id = response.data['id']
-            mock_process_notifications.assert_called_with(order_id)
+        # Get JWT token
+        refresh = RefreshToken.for_user(self.user)
+        access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        
+        # Create order
+        url = reverse('catalog:order-list')
+        data = {
+            'items': [
+                {'product': self.iphone.id, 'quantity': 1}
+            ]
+        }
+        
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify notification task was triggered
+        mock_process_notifications.assert_called_once()
+        order_id = response.data['id']
+        mock_process_notifications.assert_called_with(order_id)
     
     @patch('catalog.tasks.send_order_status_update_sms_task.delay')
     def test_order_status_update_triggers_notifications(self, mock_status_sms):
@@ -361,10 +360,10 @@ class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
             self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
             
             # Update order status
-            url = reverse('catalog:order-update-status', kwargs={'id': order.id})
+            url = reverse('catalog:order-update-status', kwargs={'pk': order.id})
             data = {'status': 'confirmed'}
             
-            response = self.client.post(url, data)
+            response = self.client.post(url, data, format='json')
             
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             
@@ -386,27 +385,25 @@ class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
             address='123 Test Street'
         )
         
-        # Mock OIDC authentication
-        with patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True):
-            # Get JWT token
-            refresh = RefreshToken.for_user(user_no_phone)
-            access_token = str(refresh.access_token)
-            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-            
-            # Create order
-            url = reverse('catalog:order-list')
-            data = {
-                'items': [
-                    {'product': self.iphone.id, 'quantity': 1}
-                ]
-            }
-            
-            response = self.client.post(url, data)
-            
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            
-            # Verify notification task was still triggered (but SMS will be skipped)
-            mock_process_notifications.assert_called_once()
+        # Get JWT token
+        refresh = RefreshToken.for_user(user_no_phone)
+        access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        
+        # Create order
+        url = reverse('catalog:order-list')
+        data = {
+            'items': [
+                {'product': self.iphone.id, 'quantity': 1}
+            ]
+        }
+        
+        response = self.client.post(url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Verify notification task was still triggered (but SMS will be skipped)
+        mock_process_notifications.assert_called_once()
 
 
 class MockAfricaTalkingTestCase(BaseNotificationTestCase):
@@ -423,7 +420,7 @@ class MockAfricaTalkingTestCase(BaseNotificationTestCase):
             }
         }
         mock_sms.send.return_value = mock_response
-        mock_africastalking.SMS = MagicMock(return_value=mock_sms)
+        mock_africastalking.SMS = mock_sms  # Return the mock directly, not a factory
         
         # Test SMS sending
         result = send_order_sms('+1234567890', 1)
