@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-e$t*+f4)e(-2r5&r1(27w+=5^d*=**1d%c-tzd^10l-9cc&uw%')
+SECRET_KEY = config('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
@@ -85,14 +85,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='techmart'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
+    "default": dj_database_url.config(
+        default=config("DATABASE_URL", default=f"sqlite:///{os.path.join(BASE_DIR, 'db.sqlite3')}"),
+        conn_max_age=600,
+        ssl_require=config('DATABASE_SSL_REQUIRE', default=False, cast=bool)
+    )
 }
 
 
@@ -187,17 +184,22 @@ OIDC_CREATE_USER = True
 OIDC_UPDATE_USER = True
 
 # Additional OIDC Settings
-OIDC_RP_REDIRECT_URI = 'http://localhost:8001/oidc/callback/'
-OIDC_RP_POST_LOGOUT_REDIRECT_URI = 'http://localhost:8001/oidc/logout/'
+OIDC_RP_REDIRECT_URI = config('OIDC_RP_REDIRECT_URI', default='http://localhost:8001/oidc/callback/')
+OIDC_RP_POST_LOGOUT_REDIRECT_URI = config('OIDC_RP_POST_LOGOUT_REDIRECT_URI', default='http://localhost:8001/oidc/logout/')
 OIDC_RP_SIGN_ALGO = 'RS256'
 OIDC_RP_IDP_SIGN_KEY = None
 
 # Session settings for OIDC
-SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_AGE = 3600  # 1 hour
+
+# CSRF settings
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # JWT Settings
 from datetime import timedelta
@@ -247,12 +249,8 @@ DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER', default='noreply@techmart.com')
 ADMIN_EMAIL = config('ADMIN_EMAIL', default='admin@techmart.com')
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8001",
-    "http://127.0.0.1:8001",
-]
-
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:8001,http://127.0.0.1:8001').split(',')
+CORS_ALLOW_CREDENTIALS = config('CORS_ALLOW_CREDENTIALS', default=True, cast=bool)
 
 # Africa's Talking Configuration
 AFRICASTALKING_USERNAME = config('AFRICASTALKING_USERNAME', default='sandbox')
