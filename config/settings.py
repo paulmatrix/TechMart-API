@@ -44,13 +44,14 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'drf_spectacular',
     'mozilla_django_oidc',
+    'corsheaders',
     'mptt',
     'catalog',
-    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,7 +66,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'catalog' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -130,6 +131,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'catalog' / 'static',
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -181,6 +186,19 @@ OIDC_RP_SCOPES = config('OIDC_RP_SCOPES', default='openid email profile')
 OIDC_CREATE_USER = True
 OIDC_UPDATE_USER = True
 
+# Additional OIDC Settings
+OIDC_RP_REDIRECT_URI = 'http://localhost:8001/oidc/callback/'
+OIDC_RP_POST_LOGOUT_REDIRECT_URI = 'http://localhost:8001/oidc/logout/'
+OIDC_RP_SIGN_ALGO = 'RS256'
+OIDC_RP_IDP_SIGN_KEY = None
+
+# Session settings for OIDC
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_AGE = 3600  # 1 hour
+
 # JWT Settings
 from datetime import timedelta
 SIMPLE_JWT = {
@@ -228,6 +246,19 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER', default='noreply@techmart.com')
 ADMIN_EMAIL = config('ADMIN_EMAIL', default='admin@techmart.com')
 
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
 # Africa's Talking Configuration
 AFRICASTALKING_USERNAME = config('AFRICASTALKING_USERNAME', default='sandbox')
 AFRICASTALKING_API_KEY = config('AFRICASTALKING_API_KEY', default='')
+
+# Auth0 Configuration
+AUTH0_DOMAIN = config('AUTH0_DOMAIN', default='your-tenant-region.auth0.com')
+AUTH0_API_IDENTIFIER = config('AUTH0_API_IDENTIFIER', default='https://techmart-api')
+AUTH0_ALGORITHMS = config('AUTH0_ALGORITHMS', default='RS256')

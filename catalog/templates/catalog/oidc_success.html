@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OIDC Authentication Success - TechMart</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+        }
+        .success-icon {
+            text-align: center;
+            font-size: 48px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .user-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .code-section {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .code-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .code-value {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin-bottom: 10px;
+        }
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .copy-btn:hover {
+            background: #5a67d8;
+        }
+        .next-steps {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .next-steps h3 {
+            color: #155724;
+            margin-top: 0;
+        }
+        .next-steps ol {
+            color: #155724;
+        }
+        .api-link {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .api-link:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h1>Authentication Successful!</h1>
+        
+        <div class="user-info">
+            <h3>Welcome, {{ user.first_name|default:user.username }}!</h3>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Username:</strong> {{ user.username }}</p>
+        </div>
+        
+        <div class="code-section">
+            <div class="code-label">Authorization Code:</div>
+            <div class="code-value" id="auth-code">{{ auth_code }}</div>
+            <button class="copy-btn" onclick="copyToClipboard('auth-code')">Copy Code</button>
+        </div>
+        
+        <div class="code-section">
+            <div class="code-label">State:</div>
+            <div class="code-value" id="state">{{ state }}</div>
+            <button class="copy-btn" onclick="copyToClipboard('state')">Copy State</button>
+        </div>
+        
+        <div class="next-steps">
+            <h3>Next Steps:</h3>
+            <ol>
+                <li>Copy the <strong>Authorization Code</strong> above</li>
+                <li>Copy the <strong>State</strong> above</li>
+                <li>Make a POST request to <code>/api/v1/oidc/token/</code> with:
+                    <pre>{
+  "authorization_code": "{{ auth_code }}",
+  "state": "{{ state }}"
+}</pre>
+                </li>
+                <li>You'll receive JWT tokens for API access</li>
+            </ol>
+        </div>
+        
+        <a href="/api/docs/" class="api-link">Go to API Documentation</a>
+    </div>
+    
+    <script>
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(function() {
+                // Change button text temporarily
+                const button = element.nextElementSibling;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#28a745';
+                
+                setTimeout(function() {
+                    button.textContent = originalText;
+                    button.style.background = '#667eea';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Could not copy text: ', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+    </script>
+</body>
+</html>

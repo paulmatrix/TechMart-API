@@ -32,7 +32,33 @@ class CategorySerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'description', 'parent', 'parent_name',
             'is_active', 'children', 'product_count', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True}
+        }
+    
+    def create(self, validated_data):
+        """Create category with auto-generated or custom slug."""
+        from django.utils.text import slugify
+        
+        name = validated_data['name']
+        
+        # Use provided slug or generate from name
+        if 'slug' in validated_data and validated_data['slug'] and validated_data['slug'].strip():
+            base_slug = slugify(validated_data['slug'])
+        else:
+            base_slug = slugify(name)
+        
+        slug = base_slug
+        
+        # Ensure slug is unique
+        counter = 1
+        while Category.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        validated_data['slug'] = slug
+        return super().create(validated_data)
     
     def get_children(self, obj):
         """Get direct children of the category."""
@@ -186,7 +212,10 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Order
-        fields = ['customer', 'items']
+        fields = ['id', 'customer', 'items']
+        extra_kwargs = {
+            'customer': {'required': False}
+        }
     
     def validate_items(self, value):
         """Validate order items."""
@@ -197,6 +226,15 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         products = [item['product'] for item in value]
         if len(products) != len(set(products)):
             raise serializers.ValidationError("Duplicate products in order items.")
+        
+        # Check stock availability
+        for item in value:
+            product = item['product']
+            quantity = item['quantity']
+            if quantity > product.stock_quantity:
+                raise serializers.ValidationError(
+                    f"Quantity {quantity} for product '{product.name}' exceeds available stock ({product.stock_quantity})."
+                )
         
         return value
     

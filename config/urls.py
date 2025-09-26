@@ -16,19 +16,26 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from mozilla_django_oidc.views import OIDCAuthenticationRequestView, OIDCAuthenticationCallbackView
+from catalog.oidc_views import TechMartOIDCLoginView, TechMartOIDCCallbackView, TechMartOIDCLogoutView
+from .views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
+    # Health Check Endpoint
+    path('health/', health_check, name='health_check'),
+    
     # OIDC Authentication URLs
-    path('oidc/authenticate/', OIDCAuthenticationRequestView.as_view(), name='oidc_authentication_init'),
-    path('oidc/callback/', OIDCAuthenticationCallbackView.as_view(), name='oidc_authentication_callback'),
+    path('oidc/authenticate/', TechMartOIDCLoginView.as_view(), name='oidc_authentication_init'),
+    path('oidc/callback/', TechMartOIDCCallbackView.as_view(), name='oidc_authentication_callback'),
+    path('oidc/logout/', TechMartOIDCLogoutView.as_view(), name='oidc_logout'),
     
     # JWT Token URLs
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # API URLs
@@ -39,3 +46,7 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+# Serve static files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

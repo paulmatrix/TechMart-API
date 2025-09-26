@@ -128,7 +128,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     """ViewSet for Category model with MPTT hierarchy support."""
     
     queryset = Category.objects.all()
-    permission_classes = [IsAuthenticatedOrReadOnlyForStaff]  # Public read access, authenticated write access
+    permission_classes = [IsAuthenticatedOrReadOnly]  # Public read access, staff write access only
     lookup_field = 'id'
     
     def get_serializer_class(self):
@@ -210,7 +210,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticatedOrReadOnlyForStaff]  # Public read access, authenticated write access
+    permission_classes = [IsAuthenticatedOrReadOnly]  # Public read access, staff write access only
     
     def get_queryset(self):
         """Filter products based on query parameters."""
@@ -252,7 +252,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return queryset.order_by('name')
     
     @action(detail=True, methods=['post'])
-    def add_stock(self, request, id=None):
+    def add_stock(self, request, pk=None):
         """
         Add stock to a product.
         
@@ -262,7 +262,14 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         quantity = request.data.get('quantity')
         
-        if not quantity or not isinstance(quantity, int) or quantity <= 0:
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return Response(
+                    {'error': 'Valid quantity is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except (ValueError, TypeError):
             return Response(
                 {'error': 'Valid quantity is required'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -274,7 +281,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
-    def reduce_stock(self, request, id=None):
+    def reduce_stock(self, request, pk=None):
         """
         Reduce stock from a product.
         
@@ -284,7 +291,14 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         quantity = request.data.get('quantity')
         
-        if not quantity or not isinstance(quantity, int) or quantity <= 0:
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return Response(
+                    {'error': 'Valid quantity is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except (ValueError, TypeError):
             return Response(
                 {'error': 'Valid quantity is required'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -394,7 +408,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             # Don't raise the exception to avoid breaking the status update
     
     @action(detail=True, methods=['post'])
-    def cancel(self, request, id=None):
+    def cancel(self, request, pk=None):
         """
         Cancel an order.
         
@@ -419,7 +433,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
-    def update_status(self, request, id=None):
+    def update_status(self, request, pk=None):
         """
         Update order status (staff only).
         

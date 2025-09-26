@@ -208,7 +208,7 @@ class NotificationFunctionTestCase(BaseNotificationTestCase):
 class CeleryTaskTestCase(BaseNotificationTestCase):
     """Test cases for Celery tasks."""
     
-    @patch('catalog.tasks.send_order_sms')
+    @patch('catalog.notifications.send_order_sms')
     def test_send_order_sms_task_success(self, mock_send_sms):
         """Test successful SMS task execution."""
         mock_send_sms.return_value = True
@@ -220,7 +220,7 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
         self.assertEqual(result['phone'], '+1234567890')
         mock_send_sms.assert_called_once_with('+1234567890', 1)
     
-    @patch('catalog.tasks.send_order_sms')
+    @patch('catalog.notifications.send_order_sms')
     def test_send_order_sms_task_failure(self, mock_send_sms):
         """Test SMS task failure."""
         mock_send_sms.return_value = False
@@ -230,7 +230,7 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
         self.assertFalse(result['success'])
         self.assertIn('error', result)
     
-    @patch('catalog.tasks.send_order_email')
+    @patch('catalog.notifications.send_order_email')
     def test_send_order_email_task_success(self, mock_send_email):
         """Test successful email task execution."""
         mock_send_email.return_value = True
@@ -242,7 +242,7 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
         self.assertEqual(result['email'], 'admin@techmart.com')
         mock_send_email.assert_called_once_with('admin@techmart.com', 1)
     
-    @patch('catalog.tasks.send_order_confirmation_email')
+    @patch('catalog.notifications.send_order_confirmation_email')
     def test_send_order_confirmation_email_task_success(self, mock_send_email):
         """Test successful confirmation email task execution."""
         mock_send_email.return_value = True
@@ -254,7 +254,7 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
         self.assertEqual(result['email'], 'test@example.com')
         mock_send_email.assert_called_once_with('test@example.com', 1)
     
-    @patch('catalog.tasks.send_order_status_update_sms')
+    @patch('catalog.notifications.send_order_status_update_sms')
     def test_send_order_status_update_sms_task_success(self, mock_send_sms):
         """Test successful status update SMS task execution."""
         mock_send_sms.return_value = True
@@ -314,7 +314,7 @@ class CeleryTaskTestCase(BaseNotificationTestCase):
 class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
     """Integration test cases for order notifications."""
     
-    @patch('catalog.views.process_order_notifications.delay')
+    @patch('catalog.tasks.process_order_notifications.delay')
     def test_order_creation_triggers_notifications(self, mock_process_notifications):
         """Test that order creation triggers notification tasks."""
         # Mock OIDC authentication
@@ -341,7 +341,7 @@ class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
             order_id = response.data['id']
             mock_process_notifications.assert_called_with(order_id)
     
-    @patch('catalog.views.send_order_status_update_sms_task.delay')
+    @patch('catalog.tasks.send_order_status_update_sms_task.delay')
     def test_order_status_update_triggers_notifications(self, mock_status_sms):
         """Test that order status update triggers notification tasks."""
         # Create an order
@@ -371,7 +371,7 @@ class OrderNotificationIntegrationTestCase(BaseNotificationTestCase):
             # Verify status update SMS task was triggered
             mock_status_sms.assert_called_once_with('+1234567890', order.id, 'confirmed')
     
-    @patch('catalog.views.process_order_notifications.delay')
+    @patch('catalog.tasks.process_order_notifications.delay')
     def test_order_creation_without_phone_skips_sms(self, mock_process_notifications):
         """Test that order creation without customer phone skips SMS notifications."""
         # Create user without phone
@@ -423,7 +423,7 @@ class MockAfricaTalkingTestCase(BaseNotificationTestCase):
             }
         }
         mock_sms.send.return_value = mock_response
-        mock_africastalking.SMS.return_value = mock_sms
+        mock_africastalking.SMS = MagicMock(return_value=mock_sms)
         
         # Test SMS sending
         result = send_order_sms('+1234567890', 1)

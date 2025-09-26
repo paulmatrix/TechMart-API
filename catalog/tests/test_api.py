@@ -1,10 +1,11 @@
 import pytest
 from decimal import Decimal
+from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..models import CustomerProfile, Category, Product, Order, OrderItem
 
@@ -85,8 +86,9 @@ class BaseAPITestCase(APITestCase):
         
         # Create API client and authenticate
         self.client = APIClient()
-        self.token = Token.objects.create(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.token.key)
+        refresh = RefreshToken.for_user(self.user)
+        self.access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
 
 
 class CategoryAPITestCase(BaseAPITestCase):
@@ -108,7 +110,7 @@ class CategoryAPITestCase(BaseAPITestCase):
             'description': 'Tablet devices',
             'parent': self.electronics.id
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Category.objects.count(), 4)
@@ -173,7 +175,7 @@ class ProductAPITestCase(BaseAPITestCase):
             'price': '1099.99',
             'stock_quantity': 8
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Product.objects.count(), 4)
@@ -198,7 +200,7 @@ class ProductAPITestCase(BaseAPITestCase):
     
     def test_add_stock(self):
         """Test adding stock to a product."""
-        url = reverse('catalog:product-add-stock', kwargs={'id': self.iphone.id})
+        url = reverse('catalog:product-add-stock', kwargs={'pk': self.iphone.id})
         data = {'quantity': 5}
         response = self.client.post(url, data)
         
@@ -208,7 +210,7 @@ class ProductAPITestCase(BaseAPITestCase):
     
     def test_reduce_stock(self):
         """Test reducing stock from a product."""
-        url = reverse('catalog:product-reduce-stock', kwargs={'id': self.iphone.id})
+        url = reverse('catalog:product-reduce-stock', kwargs={'pk': self.iphone.id})
         data = {'quantity': 3}
         response = self.client.post(url, data)
         
@@ -218,9 +220,9 @@ class ProductAPITestCase(BaseAPITestCase):
     
     def test_reduce_stock_insufficient(self):
         """Test reducing stock when insufficient."""
-        url = reverse('catalog:product-reduce-stock', kwargs={'id': self.iphone.id})
+        url = reverse('catalog:product-reduce-stock', kwargs={'pk': self.iphone.id})
         data = {'quantity': 20}  # More than available
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Insufficient stock', response.data['error'])
@@ -229,7 +231,8 @@ class ProductAPITestCase(BaseAPITestCase):
 class OrderAPITestCase(BaseAPITestCase):
     """Test cases for Order API endpoints."""
     
-    def test_create_order(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_create_order(self, mock_oidc):
         """Test creating an order with items."""
         url = reverse('catalog:order-list')
         data = {
@@ -238,7 +241,7 @@ class OrderAPITestCase(BaseAPITestCase):
                 {'product': self.samsung.id, 'quantity': 1}
             ]
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 1)
@@ -275,7 +278,8 @@ class OrderAPITestCase(BaseAPITestCase):
         expected_total = (Decimal('999.99') * 2) + (Decimal('1999.99') * 1)
         self.assertEqual(order.total, expected_total)
     
-    def test_order_stock_reduction(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_order_stock_reduction(self, mock_oidc):
         """Test that stock is reduced when order is created."""
         initial_iphone_stock = self.iphone.stock_quantity
         initial_samsung_stock = self.samsung.stock_quantity
@@ -287,7 +291,7 @@ class OrderAPITestCase(BaseAPITestCase):
                 {'product': self.samsung.id, 'quantity': 2}
             ]
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
@@ -298,7 +302,8 @@ class OrderAPITestCase(BaseAPITestCase):
         self.assertEqual(self.iphone.stock_quantity, initial_iphone_stock - 3)
         self.assertEqual(self.samsung.stock_quantity, initial_samsung_stock - 2)
     
-    def test_order_cancel(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_order_cancel(self, mock_oidc):
         """Test order cancellation and stock restoration."""
         # Create an order
         order = Order.objects.create(customer=self.user)
@@ -315,7 +320,7 @@ class OrderAPITestCase(BaseAPITestCase):
         self.iphone.reduce_stock(2)
         
         # Cancel order
-        url = reverse('catalog:order-cancel', kwargs={'id': order.id})
+        url = reverse('catalog:order-cancel', kwargs={'pk': order.id})
         response = self.client.post(url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -328,7 +333,8 @@ class OrderAPITestCase(BaseAPITestCase):
         order.refresh_from_db()
         self.assertEqual(order.status, 'cancelled')
     
-    def test_order_insufficient_stock(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_order_insufficient_stock(self, mock_oidc):
         """Test order creation with insufficient stock."""
         url = reverse('catalog:order-list')
         data = {
@@ -336,12 +342,13 @@ class OrderAPITestCase(BaseAPITestCase):
                 {'product': self.iphone.id, 'quantity': 20}  # More than available
             ]
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('exceeds available stock', str(response.data))
     
-    def test_order_duplicate_products(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_order_duplicate_products(self, mock_oidc):
         """Test order creation with duplicate products."""
         url = reverse('catalog:order-list')
         data = {
@@ -350,7 +357,7 @@ class OrderAPITestCase(BaseAPITestCase):
                 {'product': self.iphone.id, 'quantity': 2}  # Duplicate product
             ]
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Duplicate products', str(response.data))
@@ -369,12 +376,13 @@ class SerializerValidationTestCase(BaseAPITestCase):
             'price': '-10.00',  # Negative price
             'stock_quantity': 5
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('Price must be greater than 0', str(response.data))
+        self.assertIn('Ensure this value is greater than or equal to 0.01', str(response.data))
     
-    def test_order_item_quantity_validation(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_order_item_quantity_validation(self, mock_oidc):
         """Test order item quantity validation."""
         url = reverse('catalog:order-list')
         data = {
@@ -382,16 +390,17 @@ class SerializerValidationTestCase(BaseAPITestCase):
                 {'product': self.iphone.id, 'quantity': 0}  # Invalid quantity
             ]
         }
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('Quantity must be greater than 0', str(response.data))
+        self.assertIn('Ensure this value is greater than or equal to 1', str(response.data))
     
-    def test_empty_order_validation(self):
+    @patch('catalog.permissions.IsOIDCAuthenticated.has_permission', return_value=True)
+    def test_empty_order_validation(self, mock_oidc):
         """Test order creation with no items."""
         url = reverse('catalog:order-list')
         data = {'items': []}
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Order must have at least one item', str(response.data))
@@ -429,8 +438,9 @@ class AuthenticationTestCase(BaseAPITestCase):
     def test_staff_user_access(self):
         """Test that staff users can access all orders."""
         # Create staff token
-        staff_token = Token.objects.create(user=self.staff_user)
-        self.client.credentials(HTTP_AUTHORIZATION='Token ' + staff_token.key)
+        staff_refresh = RefreshToken.for_user(self.staff_user)
+        staff_access_token = str(staff_refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + staff_access_token)
         
         # Create order for regular user
         order = Order.objects.create(customer=self.user)

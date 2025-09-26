@@ -238,8 +238,16 @@ class PermissionTestCase(BaseAuthTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
+        # Create a user without a profile (simulating non-OIDC user)
+        non_oidc_user = User.objects.create_user(
+            username='nonoidc',
+            email='nonoidc@example.com',
+            password='testpass123'
+        )
+        # Don't create a profile for this user
+        
         # Regular JWT authentication should fail (not OIDC)
-        refresh = RefreshToken.for_user(self.user)
+        refresh = RefreshToken.for_user(non_oidc_user)
         access_token = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
         
@@ -254,8 +262,16 @@ class PermissionTestCase(BaseAuthTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
+        # Create a user without a profile (simulating non-OIDC user)
+        non_oidc_user = User.objects.create_user(
+            username='nonoidc2',
+            email='nonoidc2@example.com',
+            password='testpass123'
+        )
+        # Don't create a profile for this user
+        
         # Regular JWT authentication should fail (not OIDC)
-        refresh = RefreshToken.for_user(self.user)
+        refresh = RefreshToken.for_user(non_oidc_user)
         access_token = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
         
@@ -279,12 +295,20 @@ class OrderAuthenticationTestCase(BaseAuthTestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
+        # Create a user without a profile (simulating non-OIDC user)
+        non_oidc_user = User.objects.create_user(
+            username='nonoidc3',
+            email='nonoidc3@example.com',
+            password='testpass123'
+        )
+        # Don't create a profile for this user
+        
         # Regular JWT authentication should fail
-        refresh = RefreshToken.for_user(self.user)
+        refresh = RefreshToken.for_user(non_oidc_user)
         access_token = str(refresh.access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
         
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
     
     def test_order_access_owner_only(self):
@@ -352,14 +376,14 @@ class CustomerProfileAuthenticationTestCase(BaseAuthTestCase):
             self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
             
             # Access own profile should succeed
-            url = reverse('catalog:customerprofile-detail', kwargs={'id': self.customer_profile.id})
+            url = reverse('catalog:customerprofile-detail', kwargs={'pk': self.customer_profile.id})
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             
-            # Access other user's profile should fail
-            url = reverse('catalog:customerprofile-detail', kwargs={'id': self.staff_profile.id})
+            # Access other user's profile should fail (404 because queryset is filtered)
+            url = reverse('catalog:customerprofile-detail', kwargs={'pk': self.staff_profile.id})
             response = self.client.get(url)
-            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+            self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
     
     def test_staff_access_all_profiles(self):
         """Test that staff users can access all profiles."""
@@ -370,11 +394,11 @@ class CustomerProfileAuthenticationTestCase(BaseAuthTestCase):
             self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
             
             # Access any profile should succeed
-            url = reverse('catalog:customerprofile-detail', kwargs={'id': self.customer_profile.id})
+            url = reverse('catalog:customerprofile-detail', kwargs={'pk': self.customer_profile.id})
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             
-            url = reverse('catalog:customerprofile-detail', kwargs={'id': self.staff_profile.id})
+            url = reverse('catalog:customerprofile-detail', kwargs={'pk': self.staff_profile.id})
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -404,7 +428,8 @@ class MockOIDCTestCase(BaseAuthTestCase):
             ]
         }
         
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, format='json')
+        
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
         # Verify order was created

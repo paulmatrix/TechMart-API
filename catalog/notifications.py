@@ -9,11 +9,13 @@ logger = logging.getLogger(__name__)
 def initialize_africastalking():
     """Initialize Africa's Talking SDK."""
     try:
+        # Initialize Africa's Talking
         africastalking.initialize(
             username=settings.AFRICASTALKING_USERNAME,
             api_key=settings.AFRICASTALKING_API_KEY
         )
-        return africastalking.SMS()
+        # Return the SMS service class, not an instance
+        return africastalking.SMS
     except Exception as e:
         logger.error(f"Failed to initialize Africa's Talking: {e}")
         return None
