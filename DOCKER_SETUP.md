@@ -30,11 +30,7 @@ SECRET_KEY=your-secret-key-here-change-in-production
 ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 
 # Database Configuration
-DB_NAME=techmart
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_HOST=db
-DB_PORT=5432
+DATABASE_URL=postgresql://postgres:postgres@db:5432/techmart
 ```
 
 ## Docker Services

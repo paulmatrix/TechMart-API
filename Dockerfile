@@ -24,10 +24,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . /app/
 
-# Copy and make startup script executable
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 # Create a non-root user
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
@@ -36,5 +32,5 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Use startup script
-CMD ["/app/start.sh", "gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
+# Start the application directly with Gunicorn
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
